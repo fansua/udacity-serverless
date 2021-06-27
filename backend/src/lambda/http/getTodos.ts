@@ -1,50 +1,49 @@
 import 'source-map-support/register'
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult, APIGatewayProxyHandler } from 'aws-lambda'
-import * as AWS  from 'aws-sdk'
 import { createLogger } from '../../utils/logger'
 import { getUserId } from '../utils'
-import { TodoItem } from '../../models/TodoItem'
+import { fetchAllTodos } from '../../service/getAllTodos'
 
-const docClient = new AWS.DynamoDB.DocumentClient()
-
-const todosTable = process.env.TODOS_TABLE
-
-const logger = createLogger('getTodos')
+const logger = createLogger('FETCH-TODO-REQ')
 
 export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
 
-  logger.info('Prcessing get all todos event',event)
+  logger.info(`Received ${event.httpMethod} request to process ${logger.name} event `);
+
+
+  logger.info('Processing get all todos event',event)
 
   const userId = getUserId(event)
-  const  items = await getTodos(userId)
 
-  return {
-    statusCode: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*'
-    },
-    body: JSON.stringify({
-      items
-    })
-  }
-}
-
-const getTodos = async (userId: string) => {
-  // check if user exist 
-   return await getAllTodos(userId)
-}
-
-const getAllTodos = async (userId: string) => {
-
-  const result = await docClient.query({
-    TableName: todosTable,
-    //IndexName: todosByUserIndex,
-    KeyConditionExpression: 'userId = :userId',
-    ExpressionAttributeValues: {
-      ':userId': userId
+  try{
+    const  items = await fetchAllTodos(userId)
+    return {
+      statusCode: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Credentials': true
+      },
+      body: JSON.stringify({
+        items
+      })
     }
-  }).promise()
+  } catch(e) {
+    return {
+      statusCode: 500,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Credentials': true
+      },
+      body: JSON.stringify({
+        "Error": "Fail to fetch all TODO Items"
+      })
+    }
+  }
+  
 
-  return result.Items as TodoItem[]
+
 }
+
+
+

@@ -1,30 +1,27 @@
 import 'source-map-support/register'
-
 import { APIGatewayProxyEvent, APIGatewayProxyHandler, APIGatewayProxyResult } from 'aws-lambda'
-import *  as AWS from 'aws-sdk'
-import * as uuid from 'uuid'
-
-const doClient = new AWS.DynamoDB.DocumentClient()
-const todosTable = process.env.TODOS_TABLE
-
 import { CreateTodoRequest } from '../../requests/CreateTodoRequest'
+import { createToDo } from '../../service/createTodo'
 import { createLogger } from '../../utils/logger'
 import { getUserId } from '../utils'
-import { TodoItem } from '../../models/TodoItem'
 
-const logger = createLogger('create-todo')
+
+const logger = createLogger('CREA-TODO-REQ')
 
 export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
 
-  logger.info('Processing create TODO event...',{event});
-  
+  logger.info(`Received ${event.httpMethod} request to process ${logger.name} event `);
+
   const userId = getUserId(event);
 
-  const newTodo: CreateTodoRequest = JSON.parse(event.body)
+  logger.info(`Processing ${logger.name} event for user ${userId}`);
 
-  const response = createToDoItem(userId,newTodo)
-   
+  const newTodoRequest: CreateTodoRequest = JSON.parse(event.body)
   
+  
+ try{
+  const response = await createToDo(userId,newTodoRequest)  
+  logger.info(`created item->  ${response}`)
   return {
     statusCode: 201,
     headers:{
@@ -32,38 +29,25 @@ export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEven
       'Access-Control-Allow-Credentials': true
     },
     body: JSON.stringify({
-      response
+      item: response
     })
   }
-}
-
-const createToDoItem  = async(id: string, data: CreateTodoRequest) => {
-
-  const todoId = uuid.v4()
-
-  const createdAt = new Date().toISOString()
-
-  logger.info(`Creating todo ${todoId} for user ${id}`)
-
-  const newTodoItem = {
-    todoId, 
-    userId:id,
-    createdAt,
-    done: false,
-    attachmentUrl: null,
-    ...data
+ } catch(e) {
+   logger.info(`failed to create item with following error -> ${e}`)
+  return {
+    statusCode: 500,
+    headers:{
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Credentials': true
+    },
+    body: JSON.stringify({
+      'Error': e
+    })
   }
+ }
   
-  await storeItem(newTodoItem)
-
-  return  newTodoItem
+   
+  
 }
 
-const storeItem = async (data: TodoItem) => {
 
-  await doClient.put({
-    TableName: todosTable,
-    Item: data
-  }).promise()
-
-}

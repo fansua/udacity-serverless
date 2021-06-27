@@ -1,29 +1,27 @@
 import 'source-map-support/register'
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult, APIGatewayProxyHandler } from 'aws-lambda'
-import *  as AWS from 'aws-sdk'
 import { getUserId } from '../utils'
 import { createLogger } from '../../utils/logger'
+import { processDeleteTodo } from '../../service/deleteTodo'
 
 
-
-const docClient = new AWS.DynamoDB.DocumentClient()
-const todosTable = process.env.TODOS_TABLE
-const logger = createLogger('create-todo')
+const logger = createLogger('DEL-TODO-REQ')
 
 export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
 
-  console.log("Processing the delete TODO event...");
+  logger.info(`Received ${event.httpMethod} request to process ${logger.name} event `);
+
+
+  logger.info("Processing the delete TODO event...");
   
   const userId = getUserId(event)
   const todoId = event.pathParameters.todoId
 
   const response = await processDeleteTodo(userId, todoId)
 
-
-
-  if(response === -1){
-    console.log("Incorrect user permission to delete item")
+  if(response === false){
+    logger.info("Incorrect user permission to delete item")
     return {
       statusCode: 403,
       headers:{
@@ -34,9 +32,8 @@ export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEven
     }
   }
 
-  console.log("Deleting the Item")
 
-  console.log("item deleted")
+  logger.info("item deleted")
   // TODO: Remove a TODO item by id
   return {
     statusCode: 204,
@@ -44,43 +41,11 @@ export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEven
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Credentials': true
     },
-    body: ''
-  }
+    body: JSON.stringify(``)
+
+}
 }
 
 
-const processDeleteTodo = async (userId: string, todoId: string) => {
-   const itemResponse = await getItem(todoId)
 
-   if(itemResponse.Item.userId !== userId){
-     return -1
-   }
-   deleteItem(todoId)
-   return 1
 
-}
-
-const deleteItem = async(id: string) => {
-
-  logger.info(`deleting item`)
-  await docClient.delete({
-    TableName: todosTable,
-    Key:{
-       todoId:id
-    }
-   
-  }).promise()
-
-}
-
-const getItem = async(id:string) => {
-
-  const todoItem = await docClient.get({
-    TableName: todosTable,
-    Key: {
-      todoId:id
-    }
-  }).promise()
-
-  return todoItem
-}
